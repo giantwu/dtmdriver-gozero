@@ -124,6 +124,7 @@ func (z *zeroDriver) ParseServerMethod(uri string) (server string, method string
 		if sep == -1 {
 			return "", "", fmt.Errorf("bad url: '%s'. no '/' found", uri)
 		}
+		return tmp[0]+"?"+tmp[1][:sep],tmp[1][sep:],nil
 		uri = tmp[0] + tmp[1][sep:]
 	}
 
