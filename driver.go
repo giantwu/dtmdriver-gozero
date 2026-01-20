@@ -111,6 +111,20 @@ func (z *zeroDriver) RegisterService(target string, endpoint string) error {
 func (z *zeroDriver) ParseServerMethod(uri string) (server string, method string, err error) {
 
 	// 单独处理consul 的target
+	// 1. 原始标准（带 tag）
+		//"consul://127.0.0.1:8500/grpc-product?tag=wtm_service_grpc_q/product.Product/IntegralProdStockDeduction",
+		// 2. 无 query，path 中带方法（关键修正用例）
+		//"consul://192.168.1.10:8500/order-service/order.OrderService/CreateOrder",
+		// 3. 多参数（含 &）
+		//"consul://10.0.0.5:8500/inventory-svc?tag=prod&token=xyz789&timeout=5s&zone=us-east-1/inventory.StockService/DeductStock",
+		// 4. 简单方法名
+		//"consul://localhost:8500/my-api-gateway/hello.World/Say",
+		// 5. IPv6
+		//"consul://[::1]:8500/cache-svc?region=local/cache.Redis/Get",
+		// 6. query 中只有前缀和方法
+		//"consul://consul.local:8500/auth-svc?debug/auth.Service/Login",
+		// 7. 新增：显式包含多个 & 的复杂查询参数 
+		//"consul://172.16.0.100:8500/payment-svc?env=prod&tag=grpc_q&a=b&debug=true/payment.PaymentService/Process",
 	if strings.Contains(uri, kindConsul) {
 		u, err := url.Parse(uri)
 		if err != nil {
