@@ -109,31 +109,66 @@ func (z *zeroDriver) RegisterService(target string, endpoint string) error {
 }
 
 func (z *zeroDriver) ParseServerMethod(uri string) (server string, method string, err error) {
-	if !strings.Contains(uri, "//") { // 处理无scheme的情况，如果您没有直连，可以不处理
-		sep := strings.IndexByte(uri, '/')
-		if sep == -1 {
-			return "", "", fmt.Errorf("bad url: '%s'. no '/' found", uri)
+
+	// 单独处理consul 的target
+	if strings.Contains(uri, kindConsul) {
+		u, err := url.Parse(uri)
+		if err != nil {
+			return "", "", err
 		}
-		return uri[:sep], uri[sep:], nil
 
-	}
-	//resolve gozero consul wait=xx url.Parse no standard
-	if (strings.Contains(uri, kindConsul) || strings.Contains(uri, kindNacos)) && strings.Contains(uri, "?") {
-		tmp := strings.Split(uri, "?")
-		sep := strings.IndexByte(tmp[1], '/')
-		if sep == -1 {
-			return "", "", fmt.Errorf("bad url: '%s'. no '/' found", uri)
+		var method string
+
+		if u.RawQuery != "" {
+			// With query: split at FIRST '/' in RawQuery
+			if i := strings.Index(u.RawQuery, "/"); i >= 0 {
+				method = u.RawQuery[i+1:]
+				u.RawQuery = u.RawQuery[:i]
+			}
+		} else {
+			// Without query: service name is the FIRST path segment
+			path := u.Path
+			if len(path) == 0 || path[0] != '/' {
+				return "", "", fmt.Errorf("invalid path")
+			}
+			if idx := strings.Index(path[1:], "/"); idx >= 0 {
+				splitPos := 1 + idx
+				method = path[splitPos+1:]
+				u.Path = path[:splitPos]
+			}
 		}
-		uri = tmp[0] + tmp[1][sep:]
-	}
 
-	u, err := url.Parse(uri)
-	if err != nil {
-		return "", "", nil
-	}
-	index := strings.IndexByte(u.Path[1:], '/') + 1
+		if method == "" {
+			return "", "", fmt.Errorf("gRPC method part missing or empty")
+		}
+		return u.String(), method, nil
+	}else{
+		if !strings.Contains(uri, "//") { // 处理无scheme的情况，如果您没有直连，可以不处理
+			sep := strings.IndexByte(uri, '/')
+			if sep == -1 {
+				return "", "", fmt.Errorf("bad url: '%s'. no '/' found", uri)
+			}
+			return uri[:sep], uri[sep:], nil
 
-	return u.Scheme + "://" + u.Host + u.Path[:index], u.Path[index:], nil
+		}
+		//resolve gozero consul wait=xx url.Parse no standard
+		if ( strings.Contains(uri, kindNacos)) && strings.Contains(uri, "?") {
+			tmp := strings.Split(uri, "?")
+			sep := strings.IndexByte(tmp[1], '/')
+			if sep == -1 {
+				return "", "", fmt.Errorf("bad url: '%s'. no '/' found", uri)
+			}
+			uri = tmp[0] + tmp[1][sep:]
+		}
+
+		u, err := url.Parse(uri)
+		if err != nil {
+			return "", "", nil
+		}
+		index := strings.IndexByte(u.Path[1:], '/') + 1
+
+		return u.Scheme + "://" + u.Host + u.Path[:index], u.Path[index:], nil
+	}
 }
 
 func init() {
